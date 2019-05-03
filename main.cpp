@@ -12,12 +12,13 @@
 int NumThreads;
 double start;
 
-static const int MAT_SIZE = 3024;     // liczba wierszy macierzy
+static const int MAT_SIZE = 1024;     // liczba wierszy macierzy
 static const int R = 50;     // liczba wierszy macierzy
 
-float matrix_a[MAT_SIZE + R][MAT_SIZE + R];    // lewy operand
-float matrix_b[MAT_SIZE + R][MAT_SIZE + R];    // prawy operand
-float matrix_r[MAT_SIZE + R][MAT_SIZE + R];    // wynik
+float matrix_a[MAT_SIZE][MAT_SIZE];    // lewy operand
+float matrix_b[MAT_SIZE][MAT_SIZE];    // prawy operand
+float matrix_r[MAT_SIZE][MAT_SIZE];    // wynik
+
 
 FILE* result_file;
 
@@ -59,11 +60,33 @@ void multiply_matrices_KIJ()
 {
 	// mnozenie macierzy KIJ
 	int i, j, k;
-#pragma omp parallel for private(i,j)
-	for (k = 0; k < MAT_SIZE; k++)
-		for (i = 0; i < MAT_SIZE; i++)
-			for (j = 0; j < MAT_SIZE; j++)
-				matrix_r[i][j] += matrix_a[i][k] * matrix_b[k][j];
+#pragma omp parallel private(i,j,k)
+	{
+		float matrix_r_local[MAT_SIZE][MAT_SIZE];
+		#pragma omp single
+		{
+			for (j = 0; j < MAT_SIZE; j++) {
+				for (i = 0; i < MAT_SIZE; i++) {
+					matrix_r_local[i][j] = 0;
+				}
+			}
+		}
+		#pragma omp for 
+		for (k = 0; k < MAT_SIZE; k++)
+			for (i = 0; i < MAT_SIZE; i++)
+				for (j = 0; j < MAT_SIZE; j++)
+					matrix_r_local[i][j] += matrix_a[i][k] * matrix_b[k][j];
+
+
+		#pragma omp critical
+		{
+			for (j = 0; j < MAT_SIZE; j++) {
+				for (i = 0; i < MAT_SIZE; i++) {
+					matrix_r[i][j] += matrix_r_local[i][j];
+				}
+			}
+		}
+	}
 }
 
 void multiply_matrices_KIJ_SEQ()
